@@ -104,24 +104,29 @@ async function initStock(){
 }
 initStock();
 
-window.sell = async function(){
+wwindow.sell = async function(){
+
   let fuel = document.getElementById("fuel").value;
-  let liters = Number(document.getElementById("liters").value);
+  let qty = document.getElementById("qty").value;
 
-  let price = fuel=="benzine"?589.7:563.5;
+  let user = auth.currentUser;
 
-  let stockRef = doc(db,"config","stock");
-  let snap = await getDoc(stockRef);
-  let stock = snap.data();
+  if(!user){
+    alert("يجب تسجيل الدخول");
+    return;
+  }
 
-  if(stock[fuel] < liters){ alert("المخزون غير كافي"); return; }
+  // حفظ العملية في Firebase
+  await addDoc(collection(db, "sales"), {
+    fuel: fuel,
+    quantity: Number(qty),
+    userId: user.uid,
+    email: user.email,
+    date: new Date()
+  });
 
-  stock[fuel] -= liters;
-  await updateDoc(stockRef,stock);
+  alert("تم تسجيل البيع ✅");
 
-  let total = liters * price;
-
-  await addDoc(collection(db,"sales"),{fuel,liters,total,date:new Date()});
 }
 
 window.addStock = async function(){
