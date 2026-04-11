@@ -81,10 +81,17 @@ window.login = async function(){
   let email = document.getElementById("email").value;
   let password = document.getElementById("password").value;
 
-  await signInWithEmailAndPassword(auth,email,password);
+  let userCred = await signInWithEmailAndPassword(auth,email,password);
+  let user = userCred.user;
 
   document.getElementById("login").style.display="none";
   document.getElementById("app").classList.remove("hidden");
+
+  if(user.email === "admin@peka.com"){
+    alert("مرحبا المدير 👨‍💼");
+  } else {
+    alert("مرحبا عامل 👷");
+  }
 }
 
 async function initStock(){
