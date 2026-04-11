@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PEKA 7</title>
+<style>
+body {
+  font-family: Arial;
+  background: #0f172a;
+  color: white;
+  text-align: center;
+  padding: 20px;
+}
+.card {
+  background: #1e293b;
+  padding: 20px;
+  border-radius: 15px;
+  margin: 10px 0;
+}
+button {
+  padding: 10px;
+  border: none;
+  border-radius: 10px;
+  background: #22c55e;
+  color: white;
+  font-size: 16px;
+}
+input {
+  padding: 10px;
+  width: 80%;
+  margin: 5px;
+}
+</style>
+</head>
+
+<body>
+
+<h1>⛽ PEKA 7</h1>
+
+<div class="card">
+<h3>اختيار الوقود</h3>
+<select id="fuel">
+<option value="589.7">بنزين</option>
+<option value="563.5">مازوت</option>
+</select>
+
+<input type="number" id="liters" placeholder="الكمية (لتر)">
+<button onclick="calculate()">احسب</button>
+
+<h2 id="result">0 MRU</h2>
+</div>
+
+<script>
+function calculate() {
+  let price = document.getElementById("fuel").value;
+  let liters = document.getElementById("liters").value;
+  let total = price * liters;
+  document.getElementById("result").innerText = total + " MRU";
+}
+</script>
+
+</body>
+</html>
