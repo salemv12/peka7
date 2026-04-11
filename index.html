@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PEKA 7</title>
+
 <style>
 body {
   font-family: Arial;
@@ -12,25 +13,30 @@ body {
   text-align: center;
   padding: 20px;
 }
+
 .card {
   background: #1e293b;
   padding: 20px;
   border-radius: 15px;
   margin: 10px 0;
 }
+
 button {
   padding: 10px;
-  border: none;
   border-radius: 10px;
+  border: none;
   background: #22c55e;
   color: white;
   font-size: 16px;
 }
-input {
+
+input, select {
   padding: 10px;
   width: 80%;
   margin: 5px;
 }
+
+.hidden { display: none; }
 </style>
 </head>
 
@@ -38,25 +44,92 @@ input {
 
 <h1>⛽ PEKA 7</h1>
 
+<!-- LOGIN -->
+<div id="login" class="card">
+<h3>تسجيل الدخول</h3>
+<input type="password" id="pass" placeholder="كلمة المرور">
+<button onclick="login()">دخول</button>
+</div>
+
+<!-- APP -->
+<div id="app" class="hidden">
+
 <div class="card">
-<h3>اختيار الوقود</h3>
+<h3>البيع</h3>
+
 <select id="fuel">
 <option value="589.7">بنزين</option>
 <option value="563.5">مازوت</option>
 </select>
 
 <input type="number" id="liters" placeholder="الكمية (لتر)">
-<button onclick="calculate()">احسب</button>
+<button onclick="sell()">بيع</button>
 
 <h2 id="result">0 MRU</h2>
 </div>
 
+<div class="card">
+<h3>📊 التقرير</h3>
+<p>عدد العمليات: <span id="count">0</span></p>
+<p>الإجمالي: <span id="total">0</span> MRU</p>
+</div>
+
+<div class="card">
+<h3>⚙️ الإعدادات</h3>
+<input type="number" id="price1" placeholder="سعر البنزين">
+<input type="number" id="price2" placeholder="سعر المازوت">
+<button onclick="savePrices()">حفظ الأسعار</button>
+</div>
+
+</div>
+
 <script>
-function calculate() {
-  let price = document.getElementById("fuel").value;
+let sales = JSON.parse(localStorage.getItem("sales")) || [];
+let prices = JSON.parse(localStorage.getItem("prices")) || {
+  benzine: 589.7,
+  diesel: 563.5
+};
+
+function login() {
+  let pass = document.getElementById("pass").value;
+  if(pass == "1937") {
+    document.getElementById("login").style.display = "none";
+    document.getElementById("app").classList.remove("hidden");
+    update();
+  } else {
+    alert("كلمة المرور خاطئة");
+  }
+}
+
+function sell() {
+  let fuel = document.getElementById("fuel").value;
   let liters = document.getElementById("liters").value;
-  let total = price * liters;
+
+  let total = fuel * liters;
+
+  sales.push(total);
+  localStorage.setItem("sales", JSON.stringify(sales));
+
   document.getElementById("result").innerText = total + " MRU";
+  update();
+}
+
+function update() {
+  let sum = sales.reduce((a,b)=>a+b,0);
+  document.getElementById("total").innerText = sum;
+  document.getElementById("count").innerText = sales.length;
+}
+
+function savePrices() {
+  let p1 = document.getElementById("price1").value;
+  let p2 = document.getElementById("price2").value;
+
+  prices.benzine = p1;
+  prices.diesel = p2;
+
+  localStorage.setItem("prices", JSON.stringify(prices));
+
+  alert("تم حفظ الأسعار");
 }
 </script>
 
