@@ -3,7 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PEKA 7</title>
+<title>PEKA 7 Cloud</title>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"></script>
 
 <style>
 body {
@@ -11,19 +14,18 @@ body {
   background: #0f172a;
   color: white;
   text-align: center;
-  padding: 20px;
 }
 .card {
   background: #1e293b;
   padding: 20px;
+  margin: 10px;
   border-radius: 15px;
-  margin: 10px 0;
 }
 button {
   padding: 10px;
-  border-radius: 10px;
-  border: none;
   background: #22c55e;
+  border: none;
+  border-radius: 10px;
   color: white;
 }
 input, select {
@@ -31,157 +33,73 @@ input, select {
   width: 80%;
   margin: 5px;
 }
-.hidden { display: none; }
 </style>
 </head>
 
 <body>
 
-<h1>⛽ PEKA 7</h1>
-
-<div id="login" class="card">
-<h3>تسجيل الدخول</h3>
-<input type="password" id="pass" placeholder="كلمة المرور">
-<button onclick="login()">دخول</button>
-</div>
-
-<div id="app" class="hidden">
+<h1>⛽ PEKA 7 CLOUD</h1>
 
 <div class="card">
-<h3>البيع</h3>
 <select id="fuel">
 <option value="benzine">بنزين</option>
 <option value="diesel">مازوت</option>
 </select>
 
-<input type="number" id="liters" placeholder="الكمية">
+<input id="liters" type="number" placeholder="الكمية">
+
 <button onclick="sell()">بيع</button>
 
 <h2 id="result">0 MRU</h2>
 </div>
 
 <div class="card">
-<h3>📦 المخزون</h3>
-<p>بنزين: <span id="stockB"></span></p>
-<p>مازوت: <span id="stockD"></span></p>
+<h3>📊 الإجمالي</h3>
+<p id="total">0 MRU</p>
 </div>
 
-<div class="card">
-<h3>📊 التقرير</h3>
-<p>عدد العمليات: <span id="count"></span></p>
-<p>الإجمالي: <span id="total"></span> MRU</p>
-</div>
+<script type="module">
 
-<div class="card">
-<h3>🧾 الفاتورة</h3>
-<div id="invoice"></div>
-<button onclick="printInvoice()">طباعة</button>
-</div>
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getFirestore, collection, addDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-<div class="card">
-<h3>📜 سجل العمليات</h3>
-<div id="history"></div>
-</div>
-
-<div id="settings" class="card hidden">
-<h3>⚙️ الإعدادات</h3>
-<input id="priceB" placeholder="سعر البنزين">
-<input id="priceD" placeholder="سعر المازوت">
-<input id="addB" placeholder="إضافة بنزين">
-<input id="addD" placeholder="إضافة مازوت">
-<button onclick="saveSettings()">حفظ</button>
-</div>
-
-</div>
-
-<script>
-let role="";
-let sales=JSON.parse(localStorage.getItem("sales"))||[];
-let stock=JSON.parse(localStorage.getItem("stock"))||{benzine:1000,diesel:1000};
-let prices=JSON.parse(localStorage.getItem("prices"))||{benzine:589.7,diesel:563.5};
-
-function login(){
-let p=document.getElementById("pass").value;
-if(p=="1937"){role="admin";}
-else if(p=="1111"){role="worker";}
-else{alert("خطأ");return;}
-
-document.getElementById("login").style.display="none";
-document.getElementById("app").classList.remove("hidden");
-
-if(role=="admin"){
-document.getElementById("settings").classList.remove("hidden");
-}
-update();
-}
-
-function sell(){
-let fuel=document.getElementById("fuel").value;
-let liters=Number(document.getElementById("liters").value);
-
-if(stock[fuel]<liters){alert("المخزون غير كافي");return;}
-
-let total=liters*prices[fuel];
-stock[fuel]-=liters;
-
-let sale={
-id:Date.now(),
-fuel,
-liters,
-total,
-date:new Date().toLocaleString()
+const firebaseConfig = {
+  apiKey: "AIzaSyBgEOcdOgi_kzB_7HiTSxKTn0YcEyzuCIM",
+  authDomain: "peka7-710b4.firebaseapp.com",
+  projectId: "peka7-710b4",
+  storageBucket: "peka7-710b4.firebasestorage.app",
+  messagingSenderId: "619504630605",
+  appId: "1:619504630605:web:90832010f3fd3e9f499504"
 };
 
-sales.push(sale);
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
-localStorage.setItem("sales",JSON.stringify(sales));
-localStorage.setItem("stock",JSON.stringify(stock));
+window.sell = async function() {
+  let fuel = document.getElementById("fuel").value;
+  let liters = Number(document.getElementById("liters").value);
 
-showInvoice(sale);
-update();
+  let price = fuel === "benzine" ? 589.7 : 563.5;
+  let total = liters * price;
+
+  await addDoc(collection(db, "sales"), {
+    fuel,
+    liters,
+    total,
+    date: new Date()
+  });
+
+  document.getElementById("result").innerText = total + " MRU";
 }
 
-function showInvoice(s){
-document.getElementById("invoice").innerHTML=
-"رقم: "+s.id+"<br>"+
-"الوقود: "+s.fuel+"<br>"+
-"الكمية: "+s.liters+" لتر<br>"+
-"الإجمالي: "+s.total+" MRU<br>"+
-"التاريخ: "+s.date;
-}
-
-function printInvoice(){
-window.print();
-}
-
-function update(){
-let sum=sales.reduce((a,b)=>a+b.total,0);
-
-document.getElementById("total").innerText=sum;
-document.getElementById("count").innerText=sales.length;
-document.getElementById("stockB").innerText=stock.benzine;
-document.getElementById("stockD").innerText=stock.diesel;
-
-let h="";
-sales.slice(-5).reverse().forEach(s=>{
-h+=s.date+" - "+s.total+" MRU<br>";
+onSnapshot(collection(db, "sales"), (snapshot) => {
+  let sum = 0;
+  snapshot.forEach(doc => {
+    sum += doc.data().total;
+  });
+  document.getElementById("total").innerText = sum + " MRU";
 });
-document.getElementById("history").innerHTML=h;
-}
 
-function saveSettings(){
-prices.benzine=Number(document.getElementById("priceB").value);
-prices.diesel=Number(document.getElementById("priceD").value);
-
-stock.benzine+=Number(document.getElementById("addB").value||0);
-stock.diesel+=Number(document.getElementById("addD").value||0);
-
-localStorage.setItem("prices",JSON.stringify(prices));
-localStorage.setItem("stock",JSON.stringify(stock));
-
-alert("تم الحفظ");
-update();
-}
 </script>
 
 </body>
