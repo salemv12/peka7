@@ -3,65 +3,66 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PEKA 7 Cloud</title>
-
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"></script>
+<title>PEKA 7 DASHBOARD</title>
 
 <style>
-body {
-  font-family: Arial;
-  background: #0f172a;
-  color: white;
-  text-align: center;
-}
-.card {
-  background: #1e293b;
-  padding: 20px;
-  margin: 10px;
-  border-radius: 15px;
-}
-button {
-  padding: 10px;
-  background: #22c55e;
-  border: none;
-  border-radius: 10px;
-  color: white;
-}
-input, select {
-  padding: 10px;
-  width: 80%;
-  margin: 5px;
-}
+body {font-family: Arial; background:#0f172a; color:white; text-align:center;}
+.card {background:#1e293b; padding:15px; margin:10px; border-radius:15px;}
+button {padding:10px; background:#22c55e; border:none; border-radius:10px; color:white;}
+input, select {padding:10px; width:80%; margin:5px;}
+.hidden {display:none;}
 </style>
 </head>
 
 <body>
 
-<h1>⛽ PEKA 7 CLOUD</h1>
+<h1>⛽ PEKA 7 DASHBOARD</h1>
+
+<div id="login" class="card">
+<input id="email" placeholder="Email">
+<input id="password" type="password" placeholder="Password">
+<button onclick="login()">دخول</button>
+</div>
+
+<div id="app" class="hidden">
 
 <div class="card">
+<h3>💰 المبيعات</h3>
+<p id="total">0 MRU</p>
+<p>عدد العمليات: <span id="count">0</span></p>
+</div>
+
+<div class="card">
+<h3>📦 المخزون</h3>
+<p>بنزين: <span id="stockB">0</span></p>
+<p>مازوت: <span id="stockD">0</span></p>
+</div>
+
+<div class="card">
+<h3>⛽ البيع</h3>
 <select id="fuel">
 <option value="benzine">بنزين</option>
 <option value="diesel">مازوت</option>
 </select>
-
 <input id="liters" type="number" placeholder="الكمية">
-
 <button onclick="sell()">بيع</button>
-
-<h2 id="result">0 MRU</h2>
 </div>
 
 <div class="card">
-<h3>📊 الإجمالي</h3>
-<p id="total">0 MRU</p>
+<h3>⚙️ إدارة</h3>
+<input id="addB" placeholder="إضافة بنزين">
+<input id="addD" placeholder="إضافة مازوت">
+<button onclick="addStock()">إضافة مخزون</button>
+<button onclick="reset()">تصفير اليوم</button>
+</div>
+
 </div>
 
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, addDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, onSnapshot, doc, setDoc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBgEOcdOgi_kzB_7HiTSxKTn0YcEyzuCIM",
@@ -74,30 +75,83 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
 
-window.sell = async function() {
+window.login = async function(){
+  let email = document.getElementById("email").value;
+  let password = document.getElementById("password").value;
+
+  await signInWithEmailAndPassword(auth,email,password);
+
+  document.getElementById("login").style.display="none";
+  document.getElementById("app").classList.remove("hidden");
+}
+
+async function initStock(){
+  let ref = doc(db,"config","stock");
+  let snap = await getDoc(ref);
+
+  if(!snap.exists()){
+    await setDoc(ref,{benzine:1000,diesel:1000});
+  }
+}
+initStock();
+
+window.sell = async function(){
   let fuel = document.getElementById("fuel").value;
   let liters = Number(document.getElementById("liters").value);
 
-  let price = fuel === "benzine" ? 589.7 : 563.5;
+  let price = fuel=="benzine"?589.7:563.5;
+
+  let stockRef = doc(db,"config","stock");
+  let snap = await getDoc(stockRef);
+  let stock = snap.data();
+
+  if(stock[fuel] < liters){ alert("المخزون غير كافي"); return; }
+
+  stock[fuel] -= liters;
+  await updateDoc(stockRef,stock);
+
   let total = liters * price;
 
-  await addDoc(collection(db, "sales"), {
-    fuel,
-    liters,
-    total,
-    date: new Date()
-  });
-
-  document.getElementById("result").innerText = total + " MRU";
+  await addDoc(collection(db,"sales"),{fuel,liters,total,date:new Date()});
 }
 
-onSnapshot(collection(db, "sales"), (snapshot) => {
-  let sum = 0;
-  snapshot.forEach(doc => {
-    sum += doc.data().total;
+window.addStock = async function(){
+  let b = Number(document.getElementById("addB").value||0);
+  let d = Number(document.getElementById("addD").value||0);
+
+  let ref = doc(db,"config","stock");
+  let snap = await getDoc(ref);
+  let stock = snap.data();
+
+  stock.benzine += b;
+  stock.diesel += d;
+
+  await updateDoc(ref,stock);
+}
+
+window.reset = async function(){
+  let snap = await getDoc(doc(db,"config","stock"));
+  alert("تم تصفير اليوم (المبيعات فقط)");
+  location.reload();
+}
+
+onSnapshot(doc(db,"config","stock"), (doc)=>{
+  let s = doc.data();
+  document.getElementById("stockB").innerText = s.benzine;
+  document.getElementById("stockD").innerText = s.diesel;
+});
+
+onSnapshot(collection(db,"sales"), (snap)=>{
+  let sum=0;
+  let count=0;
+  snap.forEach(d=>{
+    sum+=d.data().total;
+    count++;
   });
   document.getElementById("total").innerText = sum + " MRU";
+  document.getElementById("count").innerText = count;
 });
 
 </script>
