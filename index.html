@@ -89,14 +89,15 @@ const auth = getAuth(app);
 
 let currentUser = null;
 let userRole = "worker";
+let unsubscribe = null;
 
-// 🔐 مراقبة تسجيل الدخول + role
+// 🔐 تسجيل الدخول + role
 onAuthStateChanged(auth, async (user) => {
   if(user){
     currentUser = user;
 
-    // جلب role
-    let ref = doc(db,"users",user.email);
+    // 🔥 استخدام UID (تصحيح مهم)
+    let ref = doc(db,"users",user.uid);
     let snap = await getDoc(ref);
 
     if(snap.exists()){
@@ -106,7 +107,6 @@ onAuthStateChanged(auth, async (user) => {
     document.getElementById("login").style.display="none";
     document.getElementById("app").classList.remove("hidden");
 
-    // إخفاء لوحة الإدارة للعامل
     if(userRole !== "admin"){
       document.getElementById("adminPanel").style.display="none";
     }
@@ -120,10 +120,15 @@ onAuthStateChanged(auth, async (user) => {
   }
 });
 
-// 🔑 تسجيل الدخول
+// 🔑 login
 window.login = async function(){
   let email = document.getElementById("email").value.trim();
   let password = document.getElementById("password").value.trim();
+
+  if(!email || !password){
+    alert("أدخل البيانات");
+    return;
+  }
 
   try{
     await signInWithEmailAndPassword(auth,email,password);
@@ -132,12 +137,12 @@ window.login = async function(){
   }
 };
 
-// 🚪 خروج
+// 🚪 logout
 window.logout = function(){
   signOut(auth);
 };
 
-// 🛢️ إنشاء مخزون
+// 🛢️ stock init
 async function initStock(){
   let ref = doc(db,"config","stock");
   let snap = await getDoc(ref);
@@ -148,13 +153,33 @@ async function initStock(){
 }
 initStock();
 
-// ⛽ البيع
+// ⛽ sell
 window.sell = async function(){
 
   let fuel = document.getElementById("fuel").value;
   let qty = Number(document.getElementById("liters").value);
 
   if(!currentUser) return alert("سجل الدخول");
+
+  if(!qty || qty <= 0){
+    alert("أدخل كمية صحيحة");
+    return;
+  }
+
+  let ref = doc(db,"config","stock");
+  let snap = await getDoc(ref);
+  let stock = snap.data();
+
+  // 🔥 منع نقص المخزون
+  if(fuel === "benzine" && stock.benzine < qty){
+    alert("المخزون غير كافي");
+    return;
+  }
+
+  if(fuel === "diesel" && stock.diesel < qty){
+    alert("المخزون غير كافي");
+    return;
+  }
 
   let price = fuel === "benzine" ? 600 : 500;
   let total = qty * price;
@@ -168,10 +193,7 @@ window.sell = async function(){
     date: new Date()
   });
 
-  let ref = doc(db,"config","stock");
-  let snap = await getDoc(ref);
-  let stock = snap.data();
-
+  // خصم
   if(fuel === "benzine") stock.benzine -= qty;
   else stock.diesel -= qty;
 
@@ -180,7 +202,7 @@ window.sell = async function(){
   alert("تم البيع ✅");
 };
 
-// ➕ إضافة مخزون (admin فقط)
+// ➕ add stock
 window.addStock = async function(){
   if(userRole !== "admin") return alert("ليس لديك صلاحية");
 
@@ -197,13 +219,13 @@ window.addStock = async function(){
   await updateDoc(ref,stock);
 };
 
-// 🔄 تصفير
+// 🔄 reset
 window.reset = function(){
   if(userRole !== "admin") return alert("ليس لديك صلاحية");
   location.reload();
 };
 
-// 📦 تحديث المخزون
+// 📦 stock live
 onSnapshot(doc(db,"config","stock"), (docSnap)=>{
   let s = docSnap.data();
   if(!s) return;
@@ -212,8 +234,10 @@ onSnapshot(doc(db,"config","stock"), (docSnap)=>{
   document.getElementById("stockD").innerText = s.diesel;
 });
 
-// 💰 تحميل المبيعات حسب الدور
+// 💰 sales
 function loadSales(){
+
+  if(unsubscribe) unsubscribe();
 
   let q;
 
@@ -223,7 +247,7 @@ function loadSales(){
     q = query(collection(db,"sales"), where("userId","==",currentUser.uid));
   }
 
-  onSnapshot(q, (snap)=>{
+  unsubscribe = onSnapshot(q, (snap)=>{
     let sum=0;
     let count=0;
 
