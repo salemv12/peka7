@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PEKA 7 DASHBOARD</title>
+<title>PEKA 7 houda</title>
 
 <style>
 body {font-family: Arial; background:#0f172a; color:white; text-align:center;}
@@ -18,15 +18,15 @@ input, select {padding:10px; width:80%; margin:5px;}
 
 <h1>⛽ PEKA 7 houda</h1>
 
-<!-- LOGIN -->
 <div id="login" class="card">
 <input id="email" placeholder="Email">
 <input id="password" type="password" placeholder="Password">
 <button onclick="login()">دخول</button>
 </div>
 
-<!-- APP -->
 <div id="app" class="hidden">
+
+<button onclick="logout()">🚪 خروج</button>
 
 <div class="card">
 <h3>💰 المبيعات</h3>
@@ -50,8 +50,8 @@ input, select {padding:10px; width:80%; margin:5px;}
 <button onclick="sell()">بيع</button>
 </div>
 
-<div class="card">
-<h3>⚙️ إدارة</h3>
+<div id="adminPanel" class="card">
+<h3>⚙️ إدارة (فقط للمدير)</h3>
 <input id="addB" placeholder="إضافة بنزين">
 <input id="addD" placeholder="إضافة مازوت">
 <button onclick="addStock()">إضافة مخزون</button>
@@ -65,15 +65,15 @@ input, select {padding:10px; width:80%; margin:5px;}
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { 
   getFirestore, collection, addDoc, onSnapshot,
-  doc, setDoc, getDoc, updateDoc 
+  doc, setDoc, getDoc, updateDoc,
+  query, where
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 import { 
   getAuth, signInWithEmailAndPassword,
-  onAuthStateChanged 
+  onAuthStateChanged, signOut
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-// CONFIG
 const firebaseConfig = {
   apiKey: "AIzaSyBgEOcdOgi_kzB_7HiTSxKTn0YcEyzuCIM",
   authDomain: "peka7-710b4.firebaseapp.com",
@@ -83,24 +83,38 @@ const firebaseConfig = {
   appId: "1:619504630605:web:90832010f3fd3e9f499504"
 };
 
-// INIT
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
 let currentUser = null;
+let userRole = "worker";
 
-// 🔐 مراقبة تسجيل الدخول
-onAuthStateChanged(auth, (user) => {
+// 🔐 مراقبة تسجيل الدخول + role
+onAuthStateChanged(auth, async (user) => {
   if(user){
     currentUser = user;
+
+    // جلب role
+    let ref = doc(db,"users",user.email);
+    let snap = await getDoc(ref);
+
+    if(snap.exists()){
+      userRole = snap.data().role;
+    }
 
     document.getElementById("login").style.display="none";
     document.getElementById("app").classList.remove("hidden");
 
+    // إخفاء لوحة الإدارة للعامل
+    if(userRole !== "admin"){
+      document.getElementById("adminPanel").style.display="none";
+    }
+
+    loadSales();
+
   } else {
     currentUser = null;
-
     document.getElementById("login").style.display="block";
     document.getElementById("app").classList.add("hidden");
   }
@@ -111,22 +125,19 @@ window.login = async function(){
   let email = document.getElementById("email").value.trim();
   let password = document.getElementById("password").value.trim();
 
-  if(!email || !password){
-    alert("أدخل البيانات");
-    return;
-  }
-
   try{
     await signInWithEmailAndPassword(auth,email,password);
-    alert("تم الدخول ✅");
-
   }catch(e){
     alert("❌ " + e.code);
-    console.log(e);
   }
-}
+};
 
-// 🛢️ إنشاء مخزون أولي
+// 🚪 خروج
+window.logout = function(){
+  signOut(auth);
+};
+
+// 🛢️ إنشاء مخزون
 async function initStock(){
   let ref = doc(db,"config","stock");
   let snap = await getDoc(ref);
@@ -143,21 +154,12 @@ window.sell = async function(){
   let fuel = document.getElementById("fuel").value;
   let qty = Number(document.getElementById("liters").value);
 
-  if(!currentUser){
-    alert("يجب تسجيل الدخول");
-    return;
-  }
-
-  if(!qty || qty <= 0){
-    alert("أدخل كمية صحيحة");
-    return;
-  }
+  if(!currentUser) return alert("سجل الدخول");
 
   let price = fuel === "benzine" ? 600 : 500;
   let total = qty * price;
 
-  // حفظ العملية
-  await addDoc(collection(db, "sales"), {
+  await addDoc(collection(db,"sales"),{
     fuel,
     quantity: qty,
     total,
@@ -166,7 +168,6 @@ window.sell = async function(){
     date: new Date()
   });
 
-  // خصم المخزون
   let ref = doc(db,"config","stock");
   let snap = await getDoc(ref);
   let stock = snap.data();
@@ -177,10 +178,12 @@ window.sell = async function(){
   await updateDoc(ref,stock);
 
   alert("تم البيع ✅");
-}
+};
 
-// ➕ إضافة مخزون
+// ➕ إضافة مخزون (admin فقط)
 window.addStock = async function(){
+  if(userRole !== "admin") return alert("ليس لديك صلاحية");
+
   let b = Number(document.getElementById("addB").value||0);
   let d = Number(document.getElementById("addD").value||0);
 
@@ -192,13 +195,13 @@ window.addStock = async function(){
   stock.diesel += d;
 
   await updateDoc(ref,stock);
-}
+};
 
 // 🔄 تصفير
 window.reset = function(){
-  alert("تم تصفير اليوم");
+  if(userRole !== "admin") return alert("ليس لديك صلاحية");
   location.reload();
-}
+};
 
 // 📦 تحديث المخزون
 onSnapshot(doc(db,"config","stock"), (docSnap)=>{
@@ -209,20 +212,31 @@ onSnapshot(doc(db,"config","stock"), (docSnap)=>{
   document.getElementById("stockD").innerText = s.diesel;
 });
 
-// 💰 تحديث المبيعات
-onSnapshot(collection(db,"sales"), (snap)=>{
-  let sum=0;
-  let count=0;
+// 💰 تحميل المبيعات حسب الدور
+function loadSales(){
 
-  snap.forEach(d=>{
-    let data = d.data();
-    sum += data.total || 0;
-    count++;
+  let q;
+
+  if(userRole === "admin"){
+    q = collection(db,"sales");
+  } else {
+    q = query(collection(db,"sales"), where("userId","==",currentUser.uid));
+  }
+
+  onSnapshot(q, (snap)=>{
+    let sum=0;
+    let count=0;
+
+    snap.forEach(d=>{
+      let data = d.data();
+      sum += data.total || 0;
+      count++;
+    });
+
+    document.getElementById("total").innerText = sum + " MRU";
+    document.getElementById("count").innerText = count;
   });
-
-  document.getElementById("total").innerText = sum + " MRU";
-  document.getElementById("count").innerText = count;
-});
+}
 
 </script>
 
