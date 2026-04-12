@@ -16,7 +16,7 @@ input, select {padding:10px; width:80%; margin:5px;}
 
 <body>
 
-<h1>⛽ PEKA 7 DASHBOARD</h1>
+<h1>⛽ PEKA 7 houda</h1>
 
 <!-- LOGIN -->
 <div id="login" class="card">
@@ -62,7 +62,6 @@ input, select {padding:10px; width:80%; margin:5px;}
 
 <script type="module">
 
-// Firebase
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { 
   getFirestore, collection, addDoc, onSnapshot,
@@ -99,8 +98,6 @@ onAuthStateChanged(auth, (user) => {
     document.getElementById("login").style.display="none";
     document.getElementById("app").classList.remove("hidden");
 
-    console.log("UID:", user.uid);
-
   } else {
     currentUser = null;
 
@@ -111,21 +108,21 @@ onAuthStateChanged(auth, (user) => {
 
 // 🔑 تسجيل الدخول
 window.login = async function(){
-  let email = document.getElementById("email").value;
-  let password = document.getElementById("password").value;
+  let email = document.getElementById("email").value.trim();
+  let password = document.getElementById("password").value.trim();
+
+  if(!email || !password){
+    alert("أدخل البيانات");
+    return;
+  }
 
   try{
-    let userCred = await signInWithEmailAndPassword(auth,email,password);
-    let user = userCred.user;
-
-    if(user.email === "admin@peka.com"){
-      alert("مرحبا المدير 👨‍💼");
-    } else {
-      alert("مرحبا عامل 👷");
-    }
+    await signInWithEmailAndPassword(auth,email,password);
+    alert("تم الدخول ✅");
 
   }catch(e){
-    alert("خطأ: " + e.message);
+    alert("❌ " + e.code);
+    console.log(e);
   }
 }
 
@@ -144,10 +141,15 @@ initStock();
 window.sell = async function(){
 
   let fuel = document.getElementById("fuel").value;
-  let qty = document.getElementById("liters").value;
+  let qty = Number(document.getElementById("liters").value);
 
   if(!currentUser){
     alert("يجب تسجيل الدخول");
+    return;
+  }
+
+  if(!qty || qty <= 0){
+    alert("أدخل كمية صحيحة");
     return;
   }
 
@@ -156,15 +158,15 @@ window.sell = async function(){
 
   // حفظ العملية
   await addDoc(collection(db, "sales"), {
-    fuel: fuel,
-    quantity: Number(qty),
-    total: total,
+    fuel,
+    quantity: qty,
+    total,
     userId: currentUser.uid,
     email: currentUser.email,
     date: new Date()
   });
 
-  // خصم من المخزون
+  // خصم المخزون
   let ref = doc(db,"config","stock");
   let snap = await getDoc(ref);
   let stock = snap.data();
@@ -198,7 +200,7 @@ window.reset = function(){
   location.reload();
 }
 
-// 📦 تحديث المخزون مباشر
+// 📦 تحديث المخزون
 onSnapshot(doc(db,"config","stock"), (docSnap)=>{
   let s = docSnap.data();
   if(!s) return;
