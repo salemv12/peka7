@@ -190,7 +190,7 @@ onSnapshot(collection(db,"sales"), (snap)=>{
   let sum=0;
   let count=0;
   snap.forEach(d=>{
-    sum+=d.data().total;
+    ssum += d.data().quantity;
     count++;
   });
   document.getElementById("total").innerText = sum + " MRU";
