@@ -18,12 +18,14 @@ input, select {padding:10px; width:80%; margin:5px;}
 
 <h1>⛽ PEKA 7 DASHBOARD</h1>
 
+<!-- LOGIN -->
 <div id="login" class="card">
 <input id="email" placeholder="Email">
 <input id="password" type="password" placeholder="Password">
 <button onclick="login()">دخول</button>
 </div>
 
+<!-- APP -->
 <div id="app" class="hidden">
 
 <div class="card">
@@ -60,22 +62,19 @@ input, select {padding:10px; width:80%; margin:5px;}
 
 <script type="module">
 
+// Firebase
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { 
-  getFirestore, 
-  collection, 
-  addDoc, 
-  onSnapshot, 
-  doc, 
-  setDoc, 
-  getDoc, 
-  updateDoc 
+  getFirestore, collection, addDoc, onSnapshot,
+  doc, setDoc, getDoc, updateDoc 
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
 import { 
-  getAuth, 
-  signInWithEmailAndPassword,
-  onAuthStateChanged
+  getAuth, signInWithEmailAndPassword,
+  onAuthStateChanged 
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+// CONFIG
 const firebaseConfig = {
   apiKey: "AIzaSyBgEOcdOgi_kzB_7HiTSxKTn0YcEyzuCIM",
   authDomain: "peka7-710b4.firebaseapp.com",
@@ -85,46 +84,52 @@ const firebaseConfig = {
   appId: "1:619504630605:web:90832010f3fd3e9f499504"
 };
 
+// INIT
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
-  let currentUser = null;
-    // 🔥 عرض UID داخل الصفحة
-    document.body.innerHTML += `
-      <div style="background:#000;color:#0f0;padding:10px;margin:10px;border-radius:10px;">
-        UID: ${user.uid}<br>
-        Email: ${user.email}
-      </div>
-    `;
 
-  }else{
+let currentUser = null;
+
+// 🔐 مراقبة تسجيل الدخول
+onAuthStateChanged(auth, (user) => {
+  if(user){
+    currentUser = user;
+
+    document.getElementById("login").style.display="none";
+    document.getElementById("app").classList.remove("hidden");
+
+    console.log("UID:", user.uid);
+
+  } else {
     currentUser = null;
 
-    document.body.innerHTML += `
-      <div style="background: red;color:white;padding:10px;margin:10px;">
-        ❌ لم يتم تسجيل الدخول
-      </div>
-    `;
+    document.getElementById("login").style.display="block";
+    document.getElementById("app").classList.add("hidden");
   }
 });
 
+// 🔑 تسجيل الدخول
 window.login = async function(){
   let email = document.getElementById("email").value;
   let password = document.getElementById("password").value;
 
-  let userCred = await signInWithEmailAndPassword(auth,email,password);
-  let user = userCred.user;
+  try{
+    let userCred = await signInWithEmailAndPassword(auth,email,password);
+    let user = userCred.user;
 
-  document.getElementById("login").style.display="none";
-  document.getElementById("app").classList.remove("hidden");
+    if(user.email === "admin@peka.com"){
+      alert("مرحبا المدير 👨‍💼");
+    } else {
+      alert("مرحبا عامل 👷");
+    }
 
-  if(user.email === "admin@peka.com"){
-    alert("مرحبا المدير 👨‍💼");
-  } else {
-    alert("مرحبا عامل 👷");
+  }catch(e){
+    alert("خطأ: " + e.message);
   }
 }
 
+// 🛢️ إنشاء مخزون أولي
 async function initStock(){
   let ref = doc(db,"config","stock");
   let snap = await getDoc(ref);
@@ -135,31 +140,44 @@ async function initStock(){
 }
 initStock();
 
+// ⛽ البيع
 window.sell = async function(){
 
   let fuel = document.getElementById("fuel").value;
   let qty = document.getElementById("liters").value;
 
-  let user = auth.currentUser;
-
-  if(!user){
+  if(!currentUser){
     alert("يجب تسجيل الدخول");
     return;
   }
 
-  // حفظ العملية في Firebase
+  let price = fuel === "benzine" ? 600 : 500;
+  let total = qty * price;
+
+  // حفظ العملية
   await addDoc(collection(db, "sales"), {
     fuel: fuel,
     quantity: Number(qty),
-    userId: user.uid,
-    email: user.email,
+    total: total,
+    userId: currentUser.uid,
+    email: currentUser.email,
     date: new Date()
   });
 
-  alert("تم تسجيل البيع ✅");
+  // خصم من المخزون
+  let ref = doc(db,"config","stock");
+  let snap = await getDoc(ref);
+  let stock = snap.data();
 
+  if(fuel === "benzine") stock.benzine -= qty;
+  else stock.diesel -= qty;
+
+  await updateDoc(ref,stock);
+
+  alert("تم البيع ✅");
 }
 
+// ➕ إضافة مخزون
 window.addStock = async function(){
   let b = Number(document.getElementById("addB").value||0);
   let d = Number(document.getElementById("addD").value||0);
@@ -174,25 +192,32 @@ window.addStock = async function(){
   await updateDoc(ref,stock);
 }
 
-window.reset = async function(){
-  let snap = await getDoc(doc(db,"config","stock"));
-  alert("تم تصفير اليوم (المبيعات فقط)");
+// 🔄 تصفير
+window.reset = function(){
+  alert("تم تصفير اليوم");
   location.reload();
 }
 
-onSnapshot(doc(db,"config","stock"), (doc)=>{
-  let s = doc.data();
+// 📦 تحديث المخزون مباشر
+onSnapshot(doc(db,"config","stock"), (docSnap)=>{
+  let s = docSnap.data();
+  if(!s) return;
+
   document.getElementById("stockB").innerText = s.benzine;
   document.getElementById("stockD").innerText = s.diesel;
 });
 
+// 💰 تحديث المبيعات
 onSnapshot(collection(db,"sales"), (snap)=>{
   let sum=0;
   let count=0;
+
   snap.forEach(d=>{
-    ssum += d.data().quantity;
+    let data = d.data();
+    sum += data.total || 0;
     count++;
   });
+
   document.getElementById("total").innerText = sum + " MRU";
   document.getElementById("count").innerText = count;
 });
