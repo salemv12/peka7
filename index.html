@@ -34,6 +34,12 @@ input, select {padding:10px; width:80%; margin:5px;}
 <p>عدد العمليات: <span id="count">0</span></p>
 </div>
 
+<!-- 🔥 سجل العمليات -->
+<div class="card">
+<h3>📋 سجل العمليات</h3>
+<div id="history"></div>
+</div>
+
 <div class="card">
 <h3>📦 المخزون</h3>
 <p>بنزين: <span id="stockB">0</span></p>
@@ -51,7 +57,7 @@ input, select {padding:10px; width:80%; margin:5px;}
 </div>
 
 <div id="adminPanel" class="card">
-<h3>⚙️ إدارة (فقط للمدير)</h3>
+<h3>⚙️ إدارة</h3>
 <input id="addB" placeholder="إضافة بنزين">
 <input id="addD" placeholder="إضافة مازوت">
 <button onclick="addStock()">إضافة مخزون</button>
@@ -66,7 +72,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { 
   getFirestore, collection, addDoc, onSnapshot,
   doc, setDoc, getDoc, updateDoc,
-  query, where
+  query, where, orderBy
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 import { 
@@ -91,12 +97,11 @@ let currentUser = null;
 let userRole = "worker";
 let unsubscribe = null;
 
-// 🔐 تسجيل الدخول + role
+// 🔐 login state
 onAuthStateChanged(auth, async (user) => {
   if(user){
     currentUser = user;
 
-    // 🔥 استخدام UID (تصحيح مهم)
     let ref = doc(db,"users",user.uid);
     let snap = await getDoc(ref);
 
@@ -112,37 +117,28 @@ onAuthStateChanged(auth, async (user) => {
     }
 
     loadSales();
+    loadHistory(); // 🔥 مهم
 
   } else {
-    currentUser = null;
     document.getElementById("login").style.display="block";
     document.getElementById("app").classList.add("hidden");
   }
 });
 
-// 🔑 login
+// login
 window.login = async function(){
-  let email = document.getElementById("email").value.trim();
-  let password = document.getElementById("password").value.trim();
+  let email = document.getElementById("email").value;
+  let password = document.getElementById("password").value;
 
-  if(!email || !password){
-    alert("أدخل البيانات");
-    return;
-  }
-
-  try{
-    await signInWithEmailAndPassword(auth,email,password);
-  }catch(e){
-    alert("❌ " + e.code);
-  }
+  await signInWithEmailAndPassword(auth,email,password);
 };
 
-// 🚪 logout
+// logout
 window.logout = function(){
   signOut(auth);
 };
 
-// 🛢️ stock init
+// init stock
 async function initStock(){
   let ref = doc(db,"config","stock");
   let snap = await getDoc(ref);
@@ -153,33 +149,20 @@ async function initStock(){
 }
 initStock();
 
-// ⛽ sell
+// sell
 window.sell = async function(){
 
   let fuel = document.getElementById("fuel").value;
   let qty = Number(document.getElementById("liters").value);
 
-  if(!currentUser) return alert("سجل الدخول");
-
-  if(!qty || qty <= 0){
-    alert("أدخل كمية صحيحة");
-    return;
-  }
+  if(!qty || qty <= 0) return alert("كمية غير صحيحة");
 
   let ref = doc(db,"config","stock");
   let snap = await getDoc(ref);
   let stock = snap.data();
 
-  // 🔥 منع نقص المخزون
-  if(fuel === "benzine" && stock.benzine < qty){
-    alert("المخزون غير كافي");
-    return;
-  }
-
-  if(fuel === "diesel" && stock.diesel < qty){
-    alert("المخزون غير كافي");
-    return;
-  }
+  if(fuel === "benzine" && stock.benzine < qty) return alert("المخزون غير كافي");
+  if(fuel === "diesel" && stock.diesel < qty) return alert("المخزون غير كافي");
 
   let price = fuel === "benzine" ? 600 : 500;
   let total = qty * price;
@@ -189,76 +172,74 @@ window.sell = async function(){
     quantity: qty,
     total,
     userId: currentUser.uid,
-    email: currentUser.email,
     date: new Date()
   });
 
-  // خصم
   if(fuel === "benzine") stock.benzine -= qty;
   else stock.diesel -= qty;
 
   await updateDoc(ref,stock);
 
-  alert("تم البيع ✅");
+  document.getElementById("liters").value = ""; // 🔥 تنظيف
+
+  alert("تم البيع");
 };
 
-// ➕ add stock
-window.addStock = async function(){
-  if(userRole !== "admin") return alert("ليس لديك صلاحية");
-
-  let b = Number(document.getElementById("addB").value||0);
-  let d = Number(document.getElementById("addD").value||0);
-
-  let ref = doc(db,"config","stock");
-  let snap = await getDoc(ref);
-  let stock = snap.data();
-
-  stock.benzine += b;
-  stock.diesel += d;
-
-  await updateDoc(ref,stock);
-};
-
-// 🔄 reset
-window.reset = function(){
-  if(userRole !== "admin") return alert("ليس لديك صلاحية");
-  location.reload();
-};
-
-// 📦 stock live
+// stock update
 onSnapshot(doc(db,"config","stock"), (docSnap)=>{
   let s = docSnap.data();
   if(!s) return;
 
-  document.getElementById("stockB").innerText = s.benzine;
-  document.getElementById("stockD").innerText = s.diesel;
+  stockB.innerText = s.benzine;
+  stockD.innerText = s.diesel;
 });
 
-// 💰 sales
+// sales summary
 function loadSales(){
 
-  if(unsubscribe) unsubscribe();
+  let q = userRole === "admin"
+    ? collection(db,"sales")
+    : query(collection(db,"sales"), where("userId","==",currentUser.uid));
 
-  let q;
-
-  if(userRole === "admin"){
-    q = collection(db,"sales");
-  } else {
-    q = query(collection(db,"sales"), where("userId","==",currentUser.uid));
-  }
-
-  unsubscribe = onSnapshot(q, (snap)=>{
-    let sum=0;
-    let count=0;
+  onSnapshot(q, (snap)=>{
+    let sum=0, count=0;
 
     snap.forEach(d=>{
-      let data = d.data();
-      sum += data.total || 0;
+      sum += d.data().total;
       count++;
     });
 
-    document.getElementById("total").innerText = sum + " MRU";
-    document.getElementById("count").innerText = count;
+    total.innerText = sum + " MRU";
+    countEl.innerText = count;
+  });
+}
+
+// 🔥 history
+function loadHistory(){
+
+  let q = userRole === "admin"
+    ? query(collection(db,"sales"), orderBy("date","desc"))
+    : query(collection(db,"sales"),
+        where("userId","==",currentUser.uid),
+        orderBy("date","desc")
+      );
+
+  onSnapshot(q, (snap)=>{
+    let html="";
+
+    snap.forEach(d=>{
+      let data = d.data();
+
+      html += `
+      <div style="margin:5px;padding:10px;background:#0f172a;border-radius:10px">
+        ⛽ ${data.fuel === "benzine" ? "بنزين" : "مازوت"}<br>
+        🔢 ${data.quantity} لتر<br>
+        💰 ${data.total} MRU
+      </div>
+      `;
+    });
+
+    history.innerHTML = html;
   });
 }
 
