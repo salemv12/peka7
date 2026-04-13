@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PEKA 7 </title>
+<title>PEKA 7</title>
 
 <style>
 body {font-family: Arial; background:#0f172a; color:white; text-align:center;}
@@ -16,7 +16,7 @@ input, select {padding:10px; width:80%; margin:5px;}
 
 <body>
 
-<h1>⛽ PEKA 7 </h1>
+<h1>⛽ PEKA 7</h1>
 
 <div id="login" class="card">
 <input id="email" placeholder="Email">
@@ -34,7 +34,6 @@ input, select {padding:10px; width:80%; margin:5px;}
 <p>عدد العمليات: <span id="count">0</span></p>
 </div>
 
-<!-- 🔥 سجل العمليات -->
 <div class="card">
 <h3>📋 سجل العمليات</h3>
 <div id="history"></div>
@@ -80,22 +79,27 @@ import {
   onAuthStateChanged, signOut
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
+import { serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
 const firebaseConfig = {
-  apiKey: "AIzaSyBgEOcdOgi_kzB_7HiTSxKTn0YcEyzuCIM",
-  authDomain: "peka7-710b4.firebaseapp.com",
-  projectId: "peka7-710b4",
-  storageBucket: "peka7-710b4.firebasestorage.app",
-  messagingSenderId: "619504630605",
-  appId: "1:619504630605:web:90832010f3fd3e9f499504"
+  apiKey: "YOUR_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  projectId: "YOUR_PROJECT",
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
+// تعريف العناصر
+const stockB = document.getElementById("stockB");
+const stockD = document.getElementById("stockD");
+const historyDiv = document.getElementById("history");
+const countEl = document.getElementById("count");
+const totalEl = document.getElementById("total");
+
 let currentUser = null;
 let userRole = "worker";
-let unsubscribe = null;
 
 // 🔐 login state
 onAuthStateChanged(auth, async (user) => {
@@ -117,7 +121,7 @@ onAuthStateChanged(auth, async (user) => {
     }
 
     loadSales();
-    loadHistory(); // 🔥 مهم
+    loadHistory();
 
   } else {
     document.getElementById("login").style.display="block";
@@ -129,7 +133,6 @@ onAuthStateChanged(auth, async (user) => {
 window.login = async function(){
   let email = document.getElementById("email").value;
   let password = document.getElementById("password").value;
-
   await signInWithEmailAndPassword(auth,email,password);
 };
 
@@ -172,7 +175,7 @@ window.sell = async function(){
     quantity: qty,
     total,
     userId: currentUser.uid,
-    date: new Date()
+    date: serverTimestamp()
   });
 
   if(fuel === "benzine") stock.benzine -= qty;
@@ -180,12 +183,11 @@ window.sell = async function(){
 
   await updateDoc(ref,stock);
 
-  document.getElementById("liters").value = ""; // 🔥 تنظيف
-
+  document.getElementById("liters").value = "";
   alert("تم البيع");
 };
 
-// stock update
+// stock realtime
 onSnapshot(doc(db,"config","stock"), (docSnap)=>{
   let s = docSnap.data();
   if(!s) return;
@@ -209,12 +211,12 @@ function loadSales(){
       count++;
     });
 
-    total.innerText = sum + " MRU";
+    totalEl.innerText = sum + " MRU";
     countEl.innerText = count;
   });
 }
 
-// 🔥 history
+// history
 function loadHistory(){
 
   let q = userRole === "admin"
@@ -239,7 +241,7 @@ function loadHistory(){
       `;
     });
 
-    history.innerHTML = html;
+    historyDiv.innerHTML = html;
   });
 }
 
