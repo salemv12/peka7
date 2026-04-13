@@ -79,19 +79,23 @@ import {
   onAuthStateChanged, signOut
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-import { serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { serverTimestamp, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
+// ✅ تم الاستبدال هنا
 const firebaseConfig = {
-  apiKey: "YOUR_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  projectId: "YOUR_PROJECT",
+  apiKey: "AIzaSyBgEOcdOgi_kzB_7HiTSxKTn0YcEyzuCIM",
+  authDomain: "peka7-710b4.firebaseapp.com",
+  projectId: "peka7-710b4",
+  storageBucket: "peka7-710b4.appspot.com",
+  messagingSenderId: "619504630605",
+  appId: "1:619504630605:web:90832010f3fd3e9f499504"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-// تعريف العناصر
+// العناصر
 const stockB = document.getElementById("stockB");
 const stockD = document.getElementById("stockD");
 const historyDiv = document.getElementById("history");
@@ -101,7 +105,7 @@ const totalEl = document.getElementById("total");
 let currentUser = null;
 let userRole = "worker";
 
-// 🔐 login state
+// login state
 onAuthStateChanged(auth, async (user) => {
   if(user){
     currentUser = user;
@@ -154,7 +158,6 @@ initStock();
 
 // sell
 window.sell = async function(){
-
   let fuel = document.getElementById("fuel").value;
   let qty = Number(document.getElementById("liters").value);
 
@@ -187,6 +190,34 @@ window.sell = async function(){
   alert("تم البيع");
 };
 
+// إضافة مخزون
+window.addStock = async function(){
+  let b = Number(document.getElementById("addB").value || 0);
+  let d = Number(document.getElementById("addD").value || 0);
+
+  let ref = doc(db,"config","stock");
+  let snap = await getDoc(ref);
+  let stock = snap.data();
+
+  await updateDoc(ref,{
+    benzine: stock.benzine + b,
+    diesel: stock.diesel + d
+  });
+
+  alert("تمت الإضافة");
+};
+
+// تصفير
+window.reset = async function(){
+  let sales = await getDocs(collection(db,"sales"));
+
+  sales.forEach(async (docu)=>{
+    await deleteDoc(docu.ref);
+  });
+
+  alert("تم التصفير");
+};
+
 // stock realtime
 onSnapshot(doc(db,"config","stock"), (docSnap)=>{
   let s = docSnap.data();
@@ -196,9 +227,8 @@ onSnapshot(doc(db,"config","stock"), (docSnap)=>{
   stockD.innerText = s.diesel;
 });
 
-// sales summary
+// sales
 function loadSales(){
-
   let q = userRole === "admin"
     ? collection(db,"sales")
     : query(collection(db,"sales"), where("userId","==",currentUser.uid));
@@ -218,7 +248,6 @@ function loadSales(){
 
 // history
 function loadHistory(){
-
   let q = userRole === "admin"
     ? query(collection(db,"sales"), orderBy("date","desc"))
     : query(collection(db,"sales"),
