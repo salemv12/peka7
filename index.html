@@ -71,7 +71,8 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { 
   getFirestore, collection, addDoc, onSnapshot,
   doc, setDoc, getDoc, updateDoc,
-  query, where, orderBy
+  query, where, orderBy,
+  serverTimestamp, getDocs, deleteDoc
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 import { 
@@ -79,9 +80,6 @@ import {
   onAuthStateChanged, signOut
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-import { serverTimestamp, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
-// ✅ تم الاستبدال هنا
 const firebaseConfig = {
   apiKey: "AIzaSyBgEOcdOgi_kzB_7HiTSxKTn0YcEyzuCIM",
   authDomain: "peka7-710b4.firebaseapp.com",
@@ -95,7 +93,6 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-// العناصر
 const stockB = document.getElementById("stockB");
 const stockD = document.getElementById("stockD");
 const historyDiv = document.getElementById("history");
@@ -105,7 +102,6 @@ const totalEl = document.getElementById("total");
 let currentUser = null;
 let userRole = "worker";
 
-// login state
 onAuthStateChanged(auth, async (user) => {
   if(user){
     currentUser = user;
@@ -133,19 +129,24 @@ onAuthStateChanged(auth, async (user) => {
   }
 });
 
-// login
+
+// ✅ هنا التعديل المهم
 window.login = async function(){
   let email = document.getElementById("email").value;
   let password = document.getElementById("password").value;
-  await signInWithEmailAndPassword(auth,email,password);
+
+  try {
+    await signInWithEmailAndPassword(auth,email,password);
+  } catch (error) {
+    alert("خطأ: " + error.message);
+    console.log(error);
+  }
 };
 
-// logout
 window.logout = function(){
   signOut(auth);
 };
 
-// init stock
 async function initStock(){
   let ref = doc(db,"config","stock");
   let snap = await getDoc(ref);
@@ -156,7 +157,6 @@ async function initStock(){
 }
 initStock();
 
-// sell
 window.sell = async function(){
   let fuel = document.getElementById("fuel").value;
   let qty = Number(document.getElementById("liters").value);
@@ -190,7 +190,6 @@ window.sell = async function(){
   alert("تم البيع");
 };
 
-// إضافة مخزون
 window.addStock = async function(){
   let b = Number(document.getElementById("addB").value || 0);
   let d = Number(document.getElementById("addD").value || 0);
@@ -207,7 +206,6 @@ window.addStock = async function(){
   alert("تمت الإضافة");
 };
 
-// تصفير
 window.reset = async function(){
   let sales = await getDocs(collection(db,"sales"));
 
@@ -218,7 +216,6 @@ window.reset = async function(){
   alert("تم التصفير");
 };
 
-// stock realtime
 onSnapshot(doc(db,"config","stock"), (docSnap)=>{
   let s = docSnap.data();
   if(!s) return;
@@ -227,7 +224,6 @@ onSnapshot(doc(db,"config","stock"), (docSnap)=>{
   stockD.innerText = s.diesel;
 });
 
-// sales
 function loadSales(){
   let q = userRole === "admin"
     ? collection(db,"sales")
@@ -246,7 +242,6 @@ function loadSales(){
   });
 }
 
-// history
 function loadHistory(){
   let q = userRole === "admin"
     ? query(collection(db,"sales"), orderBy("date","desc"))
